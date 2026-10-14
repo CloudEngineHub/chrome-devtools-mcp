@@ -30,6 +30,7 @@ import type {
   LaunchPWAOptions,
   PWAState,
   ScreenRecorder,
+  ScreenRecording,
   UninstallPWAOptions,
   Viewport,
   DevTools,
@@ -297,6 +298,11 @@ export type SupportedExtensions =
 /**
  * Only add methods used by tools/*.
  */
+export interface ScreenRecorderData {
+  recorder: ScreenRecorder | ScreenRecording;
+  filePath: string;
+}
+
 export type Context = Readonly<{
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
@@ -329,10 +335,6 @@ export type Context = Readonly<{
   ): Promise<{filename: string}>;
   loadResource(path: string): Promise<string>;
 
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
@@ -437,6 +439,8 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  getScreenRecorder(): ScreenRecorderData | null;
+  setScreenRecorder(data: ScreenRecorderData | null): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
