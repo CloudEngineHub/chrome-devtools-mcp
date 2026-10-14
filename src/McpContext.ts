@@ -26,11 +26,13 @@ import {
   Locator,
   type Browser,
   type BrowserContext,
+  type Connection,
   type ConsoleMessage,
   type GetPWAStateOptions,
   type InstallPWAOptions,
   type LaunchPWAOptions,
   type Page,
+  type Protocol,
   type PWAState,
   type ScreenRecorder,
   type Target,
@@ -418,6 +420,24 @@ export class McpContext implements Context {
 
   getPages(): McpPage[] {
     return Array.from(this.#mcpPages.values());
+  }
+
+  /**
+   * Fetches current target info for all targets from the browser, keyed by
+   * target id. Unlike Puppeteer's cached target info, this reflects title
+   * changes, which Chrome does not report via `Target.targetInfoChanged`.
+   * Returns an empty map if the browser cannot be queried.
+   */
+  async getTargetInfos(): Promise<Map<string, Protocol.Target.TargetInfo>> {
+    try {
+      // @ts-expect-error use existing browser connection (internal Puppeteer API).
+      const connection: Connection = this.browser._connection;
+      const {targetInfos} = await connection.send('Target.getTargets');
+      return new Map(targetInfos.map(info => [info.targetId, info]));
+    } catch (err) {
+      this.logger?.('Failed to fetch target infos', err);
+      return new Map();
+    }
   }
 
   getSelectedMcpPage(): McpPage {
