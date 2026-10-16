@@ -621,7 +621,7 @@ export class McpResponse implements Response {
     return undefined;
   }
 
-  async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
+  async #handleThirdPartyDeveloperTools(): Promise<ToolGroups | undefined> {
     if (
       this.#args.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
@@ -804,7 +804,7 @@ export class McpResponse implements Response {
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
       this.#handleAttachedConsoleMessage(),
-      this.#handleThirdPartyDevelopeTools(),
+      this.#handleThirdPartyDeveloperTools(),
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
@@ -1615,20 +1615,24 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     const thirdPartyDeveloperTools = data.thirdPartyDeveloperTools;
-    if (thirdPartyDeveloperTools?.length) {
+    if (this.#listThirdPartyDeveloperTools && thirdPartyDeveloperTools) {
       structuredContent.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
       response.push('## Third-party developer tools');
-      for (const toolGroup of thirdPartyDeveloperTools) {
-        response.push(`${toolGroup.name}: ${toolGroup.description}`);
-        response.push('Available tools:');
-        const toolDefinitionsMessage = toolGroup.tools
-          .map(tool => {
-            return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
-              tool.inputSchema,
-            )}`;
-          })
-          .join('\n');
-        response.push(toolDefinitionsMessage);
+      if (thirdPartyDeveloperTools.length === 0) {
+        response.push('No third-party developer tools available.');
+      } else {
+        for (const toolGroup of thirdPartyDeveloperTools) {
+          response.push(`${toolGroup.name}: ${toolGroup.description}`);
+          response.push('Available tools:');
+          const toolDefinitionsMessage = toolGroup.tools
+            .map(tool => {
+              return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
+                tool.inputSchema,
+              )}`;
+            })
+            .join('\n');
+          response.push(toolDefinitionsMessage);
+        }
       }
     }
 
