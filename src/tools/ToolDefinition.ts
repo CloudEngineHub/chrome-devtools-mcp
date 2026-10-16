@@ -121,6 +121,11 @@ export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   schema: Schema;
+  /**
+   * Only page-scoped tools are checked for open dialogs by ToolHandler, so a
+   * non-page tool must handle dialogs itself.
+   */
+  blockedByDialog: false;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -545,6 +550,11 @@ export interface BrowserlessToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   browserless: true;
+  /**
+   * Browserless tools have no page, so ToolHandler never checks them for open
+   * dialogs.
+   */
+  blockedByDialog: false;
   handler(
     request: Request<Schema>,
     response: Response,

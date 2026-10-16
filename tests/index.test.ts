@@ -419,5 +419,27 @@ describe('e2e', {concurrency: true}, () => {
         t.assert.snapshot(JSON.stringify(result));
       });
     });
+
+    it('when dialog is open, evaluate_script returns an error', async () => {
+      await withClient(async client => {
+        await createNewPageAndTriggerDialog(client);
+        const result = await client.callTool(
+          {
+            name: 'evaluate_script',
+            arguments: {
+              pageId: 2,
+              function: '() => 1',
+            },
+          },
+          {timeout: 10_000},
+        );
+
+        assert.strictEqual(result.isError, true);
+        assert.match(
+          getFirstText(result),
+          /A dialog is open \(alert: test dialog\)\./,
+        );
+      });
+    });
   });
 });
