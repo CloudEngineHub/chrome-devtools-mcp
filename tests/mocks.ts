@@ -24,7 +24,7 @@
 
 import './setupDevTools.js';
 
-import type {Frame} from 'puppeteer-core';
+import type {Frame, Mouse} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {
@@ -49,6 +49,7 @@ import {
   CdpBrowser,
   CdpExtension,
   CdpFrame,
+  CdpMouse,
   CdpPage,
   CDPSession,
   Connection,
@@ -74,8 +75,14 @@ import type {
   RunnerResult,
 } from '../src/third_party/index.js';
 
+export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
+  webmcp: sinon.SinonStubbedInstance<WebMCP>;
+  tracing: sinon.SinonStubbedInstance<Tracing>;
+  mouse: sinon.SinonStubbedInstance<Mouse>;
+};
+
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
-  pptrPage: sinon.SinonStubbedInstance<Page>;
+  pptrPage: MockPuppeteerPage;
   target: sinon.SinonStubbedInstance<MockTarget>;
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
@@ -219,10 +226,7 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
   return session;
 }
 
-export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
-  webmcp: sinon.SinonStubbedInstance<WebMCP>;
-  tracing: sinon.SinonStubbedInstance<Tracing>;
-} {
+export function createMockPuppeteerPage(): MockPuppeteerPage {
   const page = sinon.createStubInstance(
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
@@ -295,10 +299,19 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
     configurable: true,
   });
 
+  const mouse = sinon.createStubInstance(
+    CdpMouse,
+  ) as unknown as sinon.SinonStubbedInstance<Mouse>;
+  Object.defineProperty(page, 'mouse', {
+    value: mouse,
+    writable: true,
+    configurable: true,
+  });
+
   page.emulateFocusedPage.resolves();
   page.evaluateHandle.resolves(createMockElementHandle().handle);
 
-  return Object.assign(page, {webmcp, tracing});
+  return Object.assign(page, {webmcp, tracing, mouse});
 }
 
 export function createMockWebMCPTool(options: {
@@ -370,7 +383,7 @@ export function createMockPuppeteerTarget(
 
 export function createMockMcpPage(
   options: {
-    pptrPage?: sinon.SinonStubbedInstance<Page>;
+    pptrPage?: MockPuppeteerPage;
     target?: sinon.SinonStubbedInstance<MockTarget>;
   } = {},
 ): MockMcpPage {
