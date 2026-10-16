@@ -28,8 +28,32 @@ describe('lighthouse', () => {
       server.addHtmlRoute('/test', html`<div>Test</div>`);
 
       await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
         await page.goto(server.getRoute('/test'));
+        await mcpPage.emulate({
+          viewport: {
+            width: 390,
+            height: 844,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+          },
+        });
+        const readViewport = () =>
+          page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            deviceScaleFactor: window.devicePixelRatio,
+            screenWidth: screen.width,
+            orientation: screen.orientation.type,
+            maxTouchPoints: navigator.maxTouchPoints,
+          }));
+        const emulated = await readViewport();
+        assert.equal(emulated.width, 390);
+        assert.equal(emulated.deviceScaleFactor, 3);
+        assert.ok(emulated.maxTouchPoints > 0);
 
         await lighthouseAudit(args).handler(
           {
@@ -37,11 +61,15 @@ describe('lighthouse', () => {
               mode: 'navigation',
               device: 'desktop',
             },
-            page: context.getSelectedMcpPage(),
+            page: mcpPage,
           },
           response,
           context,
         );
+
+        // Lighthouse replaces and then clears the device metrics override, the
+        // emulated viewport must be back afterwards.
+        assert.deepEqual(await readViewport(), emulated);
 
         const data = response.attachedLighthouseResult;
         assert.ok(data);

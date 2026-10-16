@@ -1115,6 +1115,19 @@ export class McpPage implements ContextPage {
 
   async restoreEmulation(): Promise<void> {
     const currentSetting = this.emulationSettings;
+    const {viewport} = currentSetting;
+    if (viewport) {
+      // Lighthouse's CDP session replaces the device metrics override and
+      // clears it on detach, and Chrome ignores an override identical to the
+      // last one this session sent. A different width first makes the real
+      // call take effect without a reload (`isMobile` and `hasTouch` stay the
+      // same). This also runs after snapshot audits and fires a resize event,
+      // so do not remove it as redundant.
+      await this.pptrPage.setViewport({
+        ...viewport,
+        width: Math.max(1, viewport.width - 1),
+      });
+    }
     await this.emulate(currentSetting);
   }
 
