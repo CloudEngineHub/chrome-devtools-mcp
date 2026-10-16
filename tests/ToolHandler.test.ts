@@ -612,7 +612,9 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: {
         filePath: true,
-        fileList: true,
+        // allowUrl lets a remote URL pass through unchanged (file/plain paths
+        // are still validated); this is what source-map/PWA-style params use.
+        fileList: {local: true, remote: true, allowUrl: true},
       },
       handler: async request => {
         handlerCalled = true;
@@ -1011,6 +1013,7 @@ describe('ToolHandler', () => {
       verifyFilesSchema: {
         installUrlOrBundleUrl: {
           local: true,
+          allowUrl: true,
         },
       },
       handler: async () => {
@@ -1042,6 +1045,60 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(mockContext.validatePath.called, false);
+  });
+
+  it('rejects an http/ws URL for a filesystem-path parameter when allowUrl is not set, even on a local browser', async () => {
+    // Regression test for the allowUrl TSDoc in ToolDefinition.ts: a filesystem-path parameter must reject a value that merely parses as an http/ws URL instead of passing it through.
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'upload_tool',
+      description: 'A local-only file sink without allowUrl',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {
+        filePaths: zod.array(zod.string()),
+      },
+      blockedByDialog: false,
+      verifyFilesSchema: {
+        filePaths: {
+          local: true,
+          remote: false,
+        },
+      },
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
+
+    const toolMutex = new Mutex();
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parse();
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      sinon.spy(),
+    );
+
+    const traversalUrl = 'http://x/' + '../'.repeat(12) + 'etc/passwd';
+    const result = await toolHandler.handle({filePaths: [traversalUrl]});
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(handlerCalled, false);
+    sinon.assert.notCalled(mockContext.validatePath);
+    assert.strictEqual(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      'Error: This parameter expects a file path, not a URL.',
+    );
   });
 
   it('validates verifyFilesSchema with true but skips local: true on remote browser', async () => {
