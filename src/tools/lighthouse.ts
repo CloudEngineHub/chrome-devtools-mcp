@@ -298,6 +298,13 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
       reportPaths.push(res.value);
     }
 
+    // Lighthouse sets runtimeError when it could not load the page; the categories are unscored.
+    if (lhr.runtimeError) {
+      throw new Error(
+        `Lighthouse could not audit the page (${lhr.runtimeError.code}): ${lhr.runtimeError.message} Reports: ${reportPaths.join(', ')}`,
+      );
+    }
+
     const categoryScores = Object.values(lhr.categories).map(c => ({
       id: c.id,
       title: c.title,
