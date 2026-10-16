@@ -67,6 +67,34 @@ describe('browser', () => {
   });
 
   describe('BrowserManager', () => {
+    it('preserves WebSocket connection credentials for Puppeteer while redacting logs', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const connectStub = sinon
+        .stub(puppeteer, 'connect')
+        .resolves(pptrBrowser);
+      const endpoint =
+        'wss://user:password@browser.example/devtools/browser/test?token=WS_SECRET_123';
+      const headers = {
+        Authorization: 'Bearer HEADER_SECRET_456',
+        'X-Test': 'visible',
+      };
+      const manager = new BrowserManager(
+        createMockParsedArguments({wsEndpoint: endpoint, wsHeaders: headers}),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(connectStub, {
+        browserWSEndpoint: endpoint,
+        wsOptions: {headers},
+      });
+      assert.deepStrictEqual(
+        connectStub.firstCall.args[0].wsOptions?.headers,
+        headers,
+      );
+      await manager.close();
+    });
+
     it('launches a browser when no connect options are set and closes it on close()', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
