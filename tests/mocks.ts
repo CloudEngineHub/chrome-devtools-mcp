@@ -54,6 +54,7 @@ import {
   CdpPage,
   CDPSession,
   Connection,
+  ConsoleMessage,
   DevTools,
   Dialog,
   ElementHandle,
@@ -68,7 +69,10 @@ import {
 import type {
   Browser,
   BrowserContext,
+  ConsoleMessageLocation,
+  ConsoleMessageType,
   Extension,
+  JSHandle,
   Page,
   Protocol,
   Realm,
@@ -1376,4 +1380,20 @@ export function createMockHeapSnapshotAggregate(
     selfSize: options.selfSize ?? 10,
     retainedSize: options.retainedSize ?? 100,
   };
+}
+
+export function createMockConsoleMessage(
+  options: {
+    type?: ConsoleMessageType;
+    text?: string;
+    args?: JSHandle[];
+    location?: ConsoleMessageLocation;
+  } = {},
+): sinon.SinonStubbedInstance<ConsoleMessage> {
+  const message = sinon.createStubInstance(ConsoleMessage);
+  message.type.returns(options.type ?? 'log');
+  message.text.returns(options.text ?? '');
+  message.args.returns(options.args ?? []);
+  message.location.returns(options.location ?? {});
+  return message;
 }

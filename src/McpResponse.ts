@@ -235,7 +235,7 @@ export class McpResponse implements Response {
     this.#networkRequestsOptions = {
       include: value,
       pagination:
-        options?.pageSize !== undefined || options?.pageIdx !== undefined
+        options?.pageSize !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -264,7 +264,7 @@ export class McpResponse implements Response {
     this.#consoleDataOptions = {
       include: value,
       pagination:
-        options?.pageSize !== undefined || options?.pageIdx !== undefined
+        options?.pageSize !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
