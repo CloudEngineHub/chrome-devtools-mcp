@@ -22,6 +22,7 @@ import {
   PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
+  type Frame,
   type Viewport,
   type WebMCPTool,
   type Protocol,
@@ -1358,27 +1359,74 @@ export class McpPage implements ContextPage {
     options: {timeout?: number; visible?: boolean} = {},
   ): Promise<Element> {
     const {timeout, visible} = options;
-    const frames = this.pptrPage.frames();
+    const page = this.pptrPage;
+    const initialFrames = page.frames();
+    const observedFrames = new Set(initialFrames);
+    const controller = new AbortController();
 
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => {
-          const locators = [
-            frame.locator(`aria/${value}`),
-            frame.locator(`text/${value}`),
-          ];
-          return visible
-            ? locators.map(locator => locator.setVisibility('visible'))
-            : locators;
-        }),
-      ),
-    );
+    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
+      this.#locatorClass.race(
+        frames.flatMap(frame =>
+          text.flatMap(value => {
+            const locators = [
+              frame.locator(`aria/${value}`),
+              frame.locator(`text/${value}`),
+            ];
+            return visible
+              ? locators.map(locator => locator.setVisibility('visible'))
+              : locators;
+          }),
+        ),
+      );
 
+    let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {
-      locator = locator.setTimeout(timeout);
+      initialLocator = initialLocator.setTimeout(timeout);
     }
 
-    return locator.wait();
+    return new Promise<Element>((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): boolean => {
+        if (settled) {
+          return false;
+        }
+        settled = true;
+        page.off('frameattached', onFrameAttached);
+        controller.abort();
+        return true;
+      };
+      const finish = (element: Element): void => {
+        if (cleanup()) {
+          resolve(element);
+        }
+      };
+      const fail = (error: unknown): void => {
+        if (cleanup()) {
+          reject(error);
+        }
+      };
+      const onFrameAttached = (frame: Frame): void => {
+        if (observedFrames.has(frame)) {
+          return;
+        }
+        observedFrames.add(frame);
+        // The initial locator race does not include frames added later.
+        // Watch each new frame until the initial race resolves or times out.
+        // A timeout of 0 disables the frame timer; controller.abort() stops it.
+        void locatorForFrames([frame])
+          .setTimeout(0)
+          .wait({signal: controller.signal})
+          .then(finish, error => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            logger?.('Failed to wait for text in an attached frame', error);
+          });
+      };
+
+      page.on('frameattached', onFrameAttached);
+      void initialLocator.wait({signal: controller.signal}).then(finish, fail);
+    });
   }
 
   /**

@@ -12,7 +12,12 @@ import sinon from 'sinon';
 import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
+import {
+  DevTools,
+  Frame,
+  Locator,
+  ScreenRecorder,
+} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
@@ -1219,6 +1224,86 @@ describe('McpPage', () => {
           }),
         );
       });
+    });
+
+    it('finds text in an iframe attached while waiting', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>Waiting for the frame</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        const waitPromise = mcpPage.waitForTextOnPage(
+          ['Arrived in a late iframe'],
+          {timeout: 1500},
+        );
+        await page.evaluate(() => {
+          const frame = document.createElement('iframe');
+          frame.srcdoc = '<p>Arrived in a late iframe</p>';
+          document.body.appendChild(frame);
+        });
+
+        const element = await waitPromise;
+        assert.ok(element);
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('cleans the frame listener after a timed out wait', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>No matching text</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Text that never appears'], {
+            timeout: 250,
+          }),
+        );
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('applies visible matching to frames attached while waiting', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.frames.returns([]);
+      const initialRace = Locator.race([]);
+      sinon.stub(initialRace, 'wait').returns(new Promise(() => {}));
+      const lateRace = Locator.race([]);
+      const lateRaceSetTimeout = sinon
+        .stub(lateRace, 'setTimeout')
+        .returns(lateRace);
+      sinon.stub(lateRace, 'wait').resolves();
+      const race = sinon.stub(Locator, 'race');
+      race.onFirstCall().returns(initialRace);
+      race.onSecondCall().returns(lateRace);
+      const frameLocator = sinon.createStubInstance<Locator<Element>>(Locator);
+      frameLocator.setVisibility.returns(frameLocator);
+      const lateFrame = sinon.createStubInstance(Frame);
+      lateFrame.locator.returns(frameLocator);
+
+      const waitPromise = mcpPage.waitForTextOnPage(['Saved'], {visible: true});
+      pptrPage.emit('frameattached', lateFrame);
+      await waitPromise;
+
+      sinon.assert.calledWithExactly(lateFrame.locator.firstCall, 'aria/Saved');
+      sinon.assert.calledWithExactly(
+        lateFrame.locator.secondCall,
+        'text/Saved',
+      );
+      sinon.assert.calledTwice(frameLocator.setVisibility);
+      sinon.assert.alwaysCalledWithExactly(
+        frameLocator.setVisibility,
+        'visible',
+      );
+      sinon.assert.calledOnceWithExactly(lateRaceSetTimeout, 0);
     });
   });
 
