@@ -476,6 +476,7 @@ export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
  * Only add methods used by tools/*.
  */
 export type ContextPage = Readonly<{
+  readonly id: number;
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
@@ -497,6 +498,7 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  isClosed(): boolean;
   getScreenRecorder(): ScreenRecorderData | null;
   setScreenRecorder(data: ScreenRecorderData | null): void;
   setIsRunningPerformanceTrace(x: boolean): void;
