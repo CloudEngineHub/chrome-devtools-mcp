@@ -92,6 +92,30 @@ after(() => {
 });
 
 describe('McpResponse', () => {
+  it('truncates a long page title without splitting a surrogate pair', async () => {
+    // The 50 code unit limit leaves 47 for the title; the emoji sits at 46-47.
+    const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
+    const page = createMockMcpPage();
+    Object.defineProperty(page, 'id', {value: 1});
+    page.url.returns('https://example.com/emoji');
+    page.getTitle.returns(title);
+    const context = createMockMcpContext({selectedPage: page});
+    context.getPages.returns([page]);
+    context.isPageSelected.returns(true);
+    const response = new McpResponse(createMockParsedArguments());
+    response.setIncludePages(true);
+
+    const result = await response.handle(context);
+
+    assert.ok(
+      getTextContent(result.content[0]).includes(
+        `1: ${'A'.repeat(46)}... (https://example.com/emoji)`,
+      ),
+      getTextContent(result.content[0]),
+    );
+    assert.doesNotMatch(JSON.stringify(result), /\\ud83d/i);
+  });
+
   it('reports only pages opened by the attached action', async () => {
     const openedTarget = createMockPuppeteerTarget({
       url: 'https://example.com/opened',
