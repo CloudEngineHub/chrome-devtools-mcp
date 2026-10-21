@@ -329,20 +329,26 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(page);
-      this.#consoleCollector = new ConsoleCollector(page, collect => {
-        return {
-          console: event => {
-            collect(event);
-          },
-          uncaughtError: event => {
-            collect(event);
-          },
-          devtoolsAggregatedIssue: event => {
-            collect(event);
-          },
-        };
+      this.#networkCollector = new NetworkCollector(page, {
+        maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
       });
+      this.#consoleCollector = new ConsoleCollector(
+        page,
+        collect => {
+          return {
+            console: event => {
+              collect(event);
+            },
+            uncaughtError: event => {
+              collect(event);
+            },
+            devtoolsAggregatedIssue: event => {
+              collect(event);
+            },
+          };
+        },
+        {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
+      );
     }
     this.updateTimeouts();
     await this.#initDevToolsUniverseNoThrow();
@@ -1436,7 +1442,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      undefined,
+      {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       collect => {
         return {
           request: req => {
